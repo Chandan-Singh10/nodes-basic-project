@@ -1,0 +1,83 @@
+name: Node.js CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Run linting
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      # Run tests
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the project (if applicable)
+      - name: Build project
+        run: npm run build
+        if: success()
+
+      # Deploy to AWS Elastic Beanstalk (example)
+      - name: Deploy to AWS Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: my-node-app
+          environment_name: MyNodeApp-env
+          version_label: ${{ github.sha }}
+          region: us-east-1
+          deployment_package: dist.zip
+
+      # Notify on deployment success
+      - name: Notify deployment
+        if: success()
+        run: echo "Deployment to AWS Elastic Beanstalk completed successfully!"
